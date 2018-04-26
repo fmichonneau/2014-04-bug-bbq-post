@@ -1,0 +1,138 @@
+---
+title: ""
+author: "François Michonneau"
+---
+
+
+```{r setup, echo=FALSE, include=FALSE, messages=FALSE}
+library(tidyverse)
+library(hrbrthemes)
+```
+
+
+On April 12 and 13th, we ran a Bug BBQ with the objective to get the lessons for the Geospatial and Social Sciences Data Carpentry curricula ready for release. A Bug BBQ is a global, distributed event, where the community gathers to work collaboratively on our lessons. The combination of having dedicated time to look at the lessons and many fresh sets of eyes to examine the content of the lessons makes these events an excellent opportunity to bring new lessons closer to being ready to be taught. For older lessons, it is a good opportunity to go through the backlog of bugs and pull requests that may have accumulated, especially the ones that require some extra thinking, or significant changes to the lesson before being fully addressed.
+
+In addition of the Data Carpentry Geospatial and Social Sciences lessons, several others partook in the Bug BBQ: DC R ecology lesson, DC python ecology lesson, SWC R inflammation, SWC R gapminder in Spanish, and The Carpnetries Instructor Training.
+
+While Bug BBQs are mainly distributed events, they are also the opportunity for local communities to get together, and give a chance to new contributors to be supported while making their first contribution to our lessons. We had 4 local events: Toronto (Canada), Gainesville, FL (USA), Davis, CA (USA), and Buenos Aires (Argentina).
+
+
+```{r data, echo=FALSE, message=FALSE, warning=FALSE}
+
+issues <- readr::read_csv("data/issues_bug_bbq.csv")
+
+tidy_issues <- tidyr::gather(issues, event, date,
+                             -user, -number, -is_pr,
+                             -state, -repo, -organization) %>%
+    dplyr::mutate(ymd = format.Date(date, "%Y-%m-%d")) %>%
+    dplyr::filter(event != "updated_at")
+
+all_issues <- tidy_issues %>% 
+    dplyr::count(ymd, event) %>%
+    dplyr::mutate(type = "all")
+
+target_issues <- tidy_issues %>%
+    dplyr::filter(grepl("geospatial|socialsci", repo)) %>%
+    dplyr::mutate(type = case_when(
+                      grepl("geospatial", repo) ~ "geospatial",
+                      grepl("socialsci", repo) ~ "socialsci",
+                      TRUE ~ NA_character_
+                  )) %>% 
+    dplyr::count(ymd, event, type)
+
+issues <- dplyr::bind_rows(all_issues,
+                           target_issues) %>%
+    dplyr::mutate(ymd = as.Date(ymd)) %>%
+    dplyr::filter(ymd >= "2018-04-01") %>%
+    tidyr::complete(ymd, nesting(event, type), fill = list(n = 0L))
+
+filter_bbq_dates <- . %>% 
+    dplyr::filter(date >= "2018-04-12" & date <= "2018-04-14")
+    
+n_issues <- tidy_issues %>%
+    filter_bbq_dates %>% 
+    dplyr::summarize(n = n_distinct(repo, number)) %>%
+    dplyr::pull(n)
+
+n_target_issues <- tidy_issues %>%
+    filter_bbq_dates %>%
+    dplyr::filter(grepl("geospatial|socialsci", repo)) %>%
+    dplyr::summarize(n = n_distinct(repo, number)) %>%
+    dplyr::pull(n)
+
+n_contributors <- tidy_issues %>%
+    filter_bbq_dates %>%
+    dplyr::summarize(n = n_distinct(user))
+
+```
+
+There was a lot of activity in our repositories. Overall, `r n_issues` issues or pull requests were opened and/or closed during the Bug BBQ. When looking at the activity accross all The Carpentries repositories for the month of April, we can see that this level of activity is higher than usual.
+
+
+```{r n_issues, out.width="100%", echo=FALSE, message=FALSE, warning=FALSE}
+
+all_issues %>% 
+    ggplot(aes(x = as.Date(ymd), y = n, color = event)) +
+    annotate("rect", xmin = as.Date("2018-04-11"),
+             xmax = as.Date("2018-04-14"), 
+             ymin = 0, ymax = Inf,
+             alpha = 0.7,
+             fill = "gray70") +
+    geom_path() +
+    scale_x_date(limits = c(as.Date("2018-04-01"), NA)) +
+    ylim(c(0, 100)) +
+    labs(
+        title = "Number of issues and pull requests created and closed",
+        subtitle = "Across all Carpentries repositories for April 2018",
+        caption = "Shaded area represents the timing of the Bug BBQ",
+        x = "Date",
+        y = "Number of issues/pull requests"
+    ) + 
+    scale_color_manual(name = "Issues & \n Pull Requests",
+                       labels = c("Closed", "Open"), 
+                       values = c("#d45500", "#88aa00")) +
+    theme_ipsum_rc()
+```
+
+`r n_target_issues` of these issues/pull requests were made on the Geospatial and Social Science Repositories. We had `r n_contributors` unique contributors who interacted with issues and pull requests during the Bug BBQ.
+
+From the web traffic statistics we can obtain from GitHub, it also seems that the Bug BBQ attracted more traffic than usual to our repositories.
+
+```{r, out.width="100%", echo=FALSE, message=FALSE, warning=FALSE}
+
+visits <- readr::read_csv("data/visitors.csv")
+
+visits %>%
+    dplyr::group_by(timestamp) %>%
+    dplyr::summarize(
+               n_unique = sum(uniques),
+               n_visitors = sum(count)
+           ) %>%
+    tidyr::gather(visitor_type,  n, -timestamp) %>% 
+    ggplot(aes(x = timestamp, y = n)) +
+    annotate("rect", xmin = as.POSIXct("2018-04-11"),
+             xmax = as.POSIXct("2018-04-14"), 
+             ymin = 0, ymax = Inf,
+             alpha = 0.7,
+             fill = "gray70") +
+    geom_line(aes(color = visitor_type)) +
+    theme_ipsum_rc() +
+    labs(
+        title = "Web traffic across our repositories",
+        x = "Date",
+        y = "Number of vistors (summed across repositories)",
+        caption = "Shaded area represents the timing of the Bug BBQ"
+    ) +
+    scale_color_manual(name = "",
+                       labels = c("Unique", "Total"),
+                       values = c("#071159", "#ad6a06"))
+```
+
+
+Thank you to all of you who contributed to make these lessons better and closer to be ready to be taught!
+
+We are currently working on putting the last final touches on the Social Science curriculum that will be officially released on May 7th. The Geospatial curriculum will be released at the end of June. 
+
+It's not too late to contribute to these lessons (or any others). We always welcome contributions from anyone in the community.
+
+There will also be other Bug BBQ events for other curricula that we will soon add to our offering that you will be able to participate in.
